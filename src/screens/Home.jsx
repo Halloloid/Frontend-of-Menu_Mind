@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router'
-import VideoGrid from '../components/Videogrid'
+import VideoGrid from '../components/VideoGrid'
 import BlogCarousel from '../components/BlogCarousel'
 
 const Home = () => {
