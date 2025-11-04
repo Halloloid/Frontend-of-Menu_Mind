@@ -13,16 +13,21 @@ const Home = () => {
   const [suggestion,setSuggestion] = useState("")
   const [shouldFetch, setShouldFetch] = useState(false)
   const [loading,setLoading] = useState(false)
+  const [progress, setProgress] = useState(0)
   const suggestionRef = React.useRef(null)
-  const api = "http://localhost:3000/api"
+  const api = "https://backend-of-menu-mind.onrender.com/api"
 
   useEffect(() => {
     if (shouldFetch) {
       const fetchData = async () => {
         setLoading(true)
         try {
+          // bump progress to indicate GETs started
+          setProgress(prev => Math.max(prev, 55))
           const response = await axios.get(`${api}/suggestion/${score}/${dish}`)
+          setProgress(75)
           const response2 = await axios.get(`${api}/recipe/videos/${dish}`)
+          setProgress(85)
           const response3 = await axios.get(`${api}/recipe/blogs/${dish}`)
           setSuggestion(response.data.message)
           setVideos(response2.data.videos)
@@ -31,8 +36,14 @@ const Home = () => {
           setTimeout(() => {
             suggestionRef.current?.scrollIntoView({ behavior: 'smooth' })
           }, 500)
+          // finalize progress
+          setProgress(100)
+          // shortly after reaching 100% hide progress
+          setTimeout(() => setProgress(0), 600)
         } catch (err) {
           console.error("Error fetching data:", err)
+          // indicate error by resetting progress
+          setProgress(0)
         } finally {
           setShouldFetch(false) // reset trigger
           setLoading(false)
@@ -47,9 +58,25 @@ const Home = () => {
     try {
       const formData = new FormData();
       formData.append("file",image)
+      // reset progress and show loader
+      setProgress(0)
+      setLoading(true)
       const response = await axios.post(`${api}/predict`,formData,{
-        headers:{"Content-Type":"multipart/form-data"}
+        headers:{"Content-Type":"multipart/form-data"},
+        onUploadProgress: (progressEvent) => {
+          try {
+            if (progressEvent.total) {
+              // allocate upload to 0-50%
+              const percent = Math.round((progressEvent.loaded * 50) / progressEvent.total)
+              setProgress(percent)
+            }
+          } catch (e) {
+            // ignore progress errors
+          }
+        }
       })
+      // ensure at least showing half-done after upload
+      setProgress(prev => Math.max(prev, 50))
       setDish(response.data.data.prediction_class)
       setScore(response.data.data.confidence)
       setShouldFetch(true)
@@ -69,7 +96,7 @@ const Home = () => {
           Dishify
         </div>
         <button className="px-3 sm:px-6 py-1.5 sm:py-2 bg-[#F55926] text-white text-sm sm:text-base font-semibold rounded-xl hover:bg-[#e14d1f] transition-all" onClick={onSubmit}>
-          {loading ? "Identifying.." : "Identify"}
+          {loading ? `Identifying... ${progress}%` : "Identify"}
         </button>
         </nav>
         <h1 className='text-xl sm:text-2xl md:text-[28px] font-bold text-center px-4'>Upload a Food Image</h1>
@@ -97,9 +124,14 @@ const Home = () => {
     />
   )}
         </div>
-        <button className="px-4 sm:px-6 py-1.5 sm:py-2 bg-[#F55926] mt-5 text-white text-sm sm:text-base font-semibold rounded-xl hover:bg-[#e14d1f] transition-all mb-5" onClick={onSubmit}>
-          {loading ? "Identifying Dish.." : "Identify Dish"}
+        <button className="px-4 sm:px-6 py-1.5 sm:py-2 bg-[#F55926] mt-5 text-white text-sm sm:text-base font-semibold rounded-xl hover:bg-[#e14d1f] transition-all mb-2" onClick={onSubmit}>
+          {loading ? `Identifying Dish... ${progress}%` : "Identify Dish"}
         </button>
+        {loading && (
+          <div className="w-[90%] sm:w-[80%] md:w-[600px] h-2 bg-gray-200 rounded-full overflow-hidden mx-4 mb-4">
+            <div className="h-full bg-[#F55926]" style={{ width: `${progress}%`, transition: 'width 200ms ease' }} />
+          </div>
+        )}
         <h1 ref={suggestionRef} className='text-2xl sm:text-3xl md:text-5xl mx-4 my-10 sm:m-20 font-bold text-center'>{suggestion}</h1>
         {videos && videos.length > 0 && <div className="flex flex-col mt-4 w-full px-4">
           <VideoGrid videos={videos}/>
